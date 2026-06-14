@@ -76,9 +76,9 @@ export default function App() {
       setLoading(true);
       setError(null);
       try {
-        const API_URL = window.location.hostname === 'localhost' 
-          ? 'http://localhost:8000/api/graph' 
-          : '/api/graph';
+        const API_URL = import.meta.env.VITE_API_URL 
+         ? `${import.meta.env.VITE_API_URL}/api/graph` 
+         : 'http://127.0.0.1:8000/api/graph';
 
         const response = await fetch(API_URL);
         if (!response.ok) throw new Error("Gagal terhubung dengan API Server");
