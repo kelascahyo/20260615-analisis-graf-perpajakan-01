@@ -3,11 +3,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 import pandas as pd
-import igraph as ig
 
 app = FastAPI(title="Tax Graph Analyzer API")
 
-# Aktifkan CORS secara penuh agar tidak di-block browser
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,10 +21,13 @@ edges_path = os.path.join(BASE_DIR, "data", "edges_masked.csv")
 @app.get("/api/graph")
 def get_full_graph():
     try:
+        if not os.path.exists(nodes_path) or not os.path.exists(edges_path):
+            return {"elements": [], "error": "File CSV tidak ditemukan di folder backend/data/"}
+
         df_nodes = pd.read_csv(nodes_path)
         df_edges = pd.read_csv(edges_path)
         
-        # Bersihkan data
+        # Standardisasi data dan buang spasi kosong
         df_nodes['id'] = df_nodes['id'].astype(str).str.strip()
         df_nodes['nama'] = df_nodes['nama'].astype(str).str.strip()
         df_nodes['jenis_node'] = df_nodes['jenis_node'].astype(str).str.strip()
@@ -35,27 +36,27 @@ def get_full_graph():
         df_edges['target'] = df_edges['target'].astype(str).str.strip()
         df_edges['rel_id'] = df_edges['rel_id'].astype(str).str.strip()
         
-        # 🌟 OPTIMASI: Ambil 150 relasi dengan nilai saham terbesar agar graf tidak hang/blank
-        df_edges = df_edges.sort_values(by='nilai', ascending=False).head(150)
+        # Batasi mengambil 100 relasi pertama saja untuk testing agar pasti muncul dulu
+        df_edges_limited = df_edges.head(100)
         
-        # Ambil list ID node yang aktif di 150 relasi tersebut
-        active_node_ids = set(df_edges['sumber'].tolist() + df_edges['target'].tolist())
-        df_nodes = df_nodes[df_nodes['id'].isin(active_node_ids)]
+        # Kumpulkan ID yang terlibat dalam relasi tersebut
+        involved_ids = set(df_edges_limited['sumber'].tolist() + df_edges_limited['target'].tolist())
+        df_nodes_limited = df_nodes[df_nodes['id'].isin(involved_ids)]
         
         elements = []
         
-        # Masukkan Nodes
-        for _, row in df_nodes.iterrows():
+        # Bentuk data Node untuk Cytoscape
+        for _, row in df_nodes_limited.iterrows():
             elements.append({
                 "data": {
-                    "id": row['id'], 
-                    "label": row['nama'], 
-                    "jenis": row['jenis_node']
+                    "id": str(row['id']), 
+                    "label": str(row['nama']), 
+                    "jenis": str(row['jenis_node'])
                 }
             })
             
-        # Masukkan Edges
-        for _, row in df_edges.iterrows():
+        # Bentuk data Edge untuk Cytoscape
+        for _, row in df_edges_limited.iterrows():
             elements.append({
                 "data": {
                     "id": str(row['rel_id']),
